@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from scipy.io import wavfile
 from utils import butter_bandpass_filter, get_timit_dict, get_target, create_mel_filter, pretty_spectrogram, make_mel
-import matplotlib.pyplot as plt
+from python_speech_features import mfcc
 
 # preprocess feature data
 rate, data = wavfile.read("data/LDC93S1.wav")
@@ -14,13 +14,7 @@ mel_filter, mel_inversion_filter = create_mel_filter(fft_size=2048,
                                                      start_freq=300,
                                                      end_freq=8000)
 mel_spec = make_mel(wav_spectrogram, mel_filter, shorten_factor=10)
-
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(20,4))
-
-cax = ax.matshow(mel_spec, interpolation='nearest', aspect='auto', cmap=plt.cm.afmhot, origin='lower')
-fig.colorbar(cax)
-plt.title('mel Spectrogram')
-plt.show()
+mfcc_data = mfcc(data, rate)
 
 # preprocess label data
 labels = get_timit_dict("phonedict.txt")
