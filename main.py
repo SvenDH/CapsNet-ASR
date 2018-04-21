@@ -18,8 +18,8 @@ for d in dirlist:
             if not fname.endswith('.PHN') or (fname.startswith("SA")):
                 continue
 
-            phn_fname = dirName + '\\' + fname
-            wav_fname = dirName + '\\' + fname[0:-4] + '.WAV'
+            phn_fname = dirName + fname
+            wav_fname = dirName + fname[0:-4] + '.WAV'
 
             rate, data = wavfile.read(wav_fname)
             data = butter_bandpass_filter(data, 500, 7999, rate, order=1)
