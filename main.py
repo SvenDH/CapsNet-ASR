@@ -1,31 +1,49 @@
 import numpy as np
 import tensorflow as tf
 from scipy.io import wavfile
-from utils import butter_bandpass_filter, get_timit_dict, get_target, create_mel_filter, pretty_spectrogram, make_mel
+from utils import get_timit_dict, get_target, pretty_spectrogram, sliding_window
 from python_speech_features import mfcc
 import os
 
 labels = get_timit_dict('phonedict.txt')
 
+rate = 16000 #16000fps - 0.0625ms per frame
+stepsize = 32 #for spectogram reduction
+
+frame_size = (int)((0.030 * rate) / stepsize) #30ms
+frame_step = (int)((0.010 * rate) / stepsize) #15ms
+
+print('Frame size: {}, frame step size: {}'.format(frame_size, frame_step))
+
 # preprocess data
+audio = []
 spectograms = []
-mfccs = []
+#mfccs = []
 phones = []
 for dirName, subdirList, fileList in os.walk('./data/TRAIN/'):
     for fname in fileList:
-        if not fname.endswith('.PHN') or (fname.startswith('SA')):
+        if not fname.endswith('.phn') and not fname.endswith('.PHN') or (fname.startswith('SA')):
             continue
 
         phn_fname = dirName + fname
         wav_fname = dirName + fname[0:-4] + '.WAV'
 
-        rate, data = wavfile.read(wav_fname)
-        data = butter_bandpass_filter(data, 500, 7999, rate, order=1)
+        _, data = wavfile.read(wav_fname)
 
-        spectograms.append(pretty_spectrogram(data.astype('float64')))
-        mfccs.append(mfcc(data, rate))
-        phones.append(get_target(phn_fname, labels, data.shape[0]))
+        audio.append(data)
+        spectogram = pretty_spectrogram(data.astype('float64'), step_size=stepsize)
+        phone_ids = get_target(phn_fname, labels, data.shape[0])
+        for x, window in sliding_window(spectogram, frame_step, frame_size):
+            spectograms.append(window)
+            idx = x * stepsize + (int)(stepsize * frame_size / 2)
+            phones.append(phone_ids[idx])
+
+        #mfccs.append(mfcc(data, rate))
 
         print('Loaded: {}'.format(fname[0:-4]))
+audio = np.concatenate(audio)
+spectograms = np.stack(spectograms)
+#mfccs = np.concatenate(mfccs)
+phones = np.array(phones)
 
 # TODO: build and train model

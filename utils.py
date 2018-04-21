@@ -364,3 +364,8 @@ def get_target(phn_location, dict_timit, input_size):
             target[i] = tarray
 
     return target
+
+
+def sliding_window(data, step_size, window_size):
+    for x in range(0, data.shape[0] - window_size, step_size):
+        yield x, data[x:x + window_size]
