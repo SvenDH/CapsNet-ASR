@@ -3,6 +3,7 @@ import tensorflow as tf
 from scipy.io import wavfile
 from utils import butter_bandpass_filter, get_timit_dict, get_target, create_mel_filter, pretty_spectrogram, make_mel
 from python_speech_features import mfcc
+import os
 
 dirlist = "./data/"
 labels = get_timit_dict("phonedict.txt")
