@@ -8,10 +8,10 @@ import os
 labels = get_timit_dict('phonedict.txt')
 
 rate = 16000 #16000fps - 0.0625ms per frame
-stepsize = 32 #for spectogram reduction
+stepsize = 64 #for spectogram reduction
 
 frame_size = (int)((0.030 * rate) / stepsize) #30ms
-frame_step = (int)((0.010 * rate) / stepsize) #15ms
+frame_step = (int)((0.015 * rate) / stepsize) #15ms
 
 print('Frame size: {}, frame step size: {}'.format(frame_size, frame_step))
 
