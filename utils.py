@@ -1,7 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
+import tensorflow as tf
 import copy
-from scipy.io import wavfile
 from scipy.signal import butter, lfilter
 import scipy.ndimage
 
@@ -369,3 +368,13 @@ def get_target(phn_location, dict_timit, input_size):
 def sliding_window(data, step_size, window_size):
     for x in range(0, data.shape[0] - window_size, step_size):
         yield x, data[x:x + window_size]
+
+
+def get_batch_data(data, labels, batch_size, num_threads):
+    data_queues = tf.train.slice_input_producer([data, labels])
+    X, Y = tf.train.shuffle_batch(data_queues, num_threads=num_threads,
+                                  batch_size=batch_size,
+                                  capacity=batch_size * 64,
+                                  min_after_dequeue=batch_size * 32,
+                                  allow_smaller_final_batch=False)
+    return(X, Y)

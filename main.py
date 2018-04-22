@@ -1,11 +1,13 @@
 import numpy as np
 import tensorflow as tf
 from scipy.io import wavfile
-from utils import get_timit_dict, get_target, pretty_spectrogram, sliding_window
+from utils import get_timit_dict, get_target, pretty_spectrogram, sliding_window, get_batch_data
 from python_speech_features import mfcc
 import os
+from model import CapsNet
 
 labels = get_timit_dict('phonedict.txt')
+batch_size = 64
 
 rate = 16000 #16000fps - 0.0625ms per frame
 stepsize = 64 #for spectogram reduction
@@ -46,4 +48,6 @@ spectograms = np.stack(spectograms)
 #mfccs = np.concatenate(mfccs)
 phones = np.array(phones)
 
-# TODO: build and train model
+X, y = get_batch_data(spectograms, phones, batch_size, 8)
+
+model = CapsNet(X, y)
