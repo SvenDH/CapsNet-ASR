@@ -41,29 +41,6 @@ class CapsLayer(object):
             if not self.with_routing:
                 # the PrimaryCaps layer, a convolutional layer
                 # input: [batch_size, 20, 20, 256]
-                assert input.get_shape() == [batch_size, 20, 20, 256]
-
-                '''
-                # version 1, computational expensive
-                capsules = []
-                for i in range(self.vec_len):
-                    # each capsule i: [batch_size, 6, 6, 32]
-                    with tf.variable_scope('ConvUnit_' + str(i)):
-                        caps_i = tf.contrib.layers.conv2d(input, self.num_outputs,
-                                                          self.kernel_size, self.stride,
-                                                          padding="VALID", activation_fn=None)
-                        caps_i = tf.reshape(caps_i, shape=(cfg.batch_size, -1, 1, 1))
-                        capsules.append(caps_i)
-                assert capsules[0].get_shape() == [cfg.batch_size, 1152, 1, 1]
-                capsules = tf.concat(capsules, axis=2)
-                '''
-
-                # version 2, equivalent to version 1 but higher computational
-                # efficiency.
-                # NOTE: I can't find out any words from the paper whether the
-                # PrimaryCap convolution does a ReLU activation or not before
-                # squashing function, but experiment show that using ReLU get a
-                # higher test accuracy. So, which one to use will be your choice
                 capsules = tf.contrib.layers.conv2d(input, self.num_outputs * self.vec_len,
                                                     self.kernel_size, self.stride, padding="VALID",
                                                     activation_fn=tf.nn.relu)
@@ -74,7 +51,6 @@ class CapsLayer(object):
 
                 # [batch_size, 1152, 8, 1]
                 capsules = squash(capsules)
-                assert capsules.get_shape() == [batch_size, 1152, 8, 1]
                 return(capsules)
 
         if self.layer_type == 'FC':
@@ -118,11 +94,9 @@ def routing(input, b_IJ):
     # element-wise multiply [a*c, b] * [a*c, b], reduce_sum at axis=1 and
     # reshape to [a, c]
     input = tf.tile(input, [1, 1, 160, 1, 1])
-    assert input.get_shape() == [batch_size, 1152, 160, 8, 1]
 
-    u_hat = tf.nn.reduce_sum(W * input, axis=3, keepdims=True)
+    u_hat = tf.reduce_sum(W * input, axis=3, keepdims=True)
     u_hat = tf.reshape(u_hat, shape=[-1, 1152, 10, 16, 1])
-    assert u_hat.get_shape() == [batch_size, 1152, 10, 16, 1]
 
     # In forward, u_hat_stopped = u_hat; in backward, no gradient passed back from u_hat_stopped to u_hat
     u_hat_stopped = tf.stop_gradient(u_hat, name='stop_gradient')
@@ -141,16 +115,14 @@ def routing(input, b_IJ):
                 # => [batch_size, 1152, 10, 16, 1]
                 s_J = tf.multiply(c_IJ, u_hat)
                 # then sum in the second dim, resulting in [batch_size, 1, 10, 16, 1]
-                s_J = tf.nn.reduce_sum(s_J, axis=1, keepdims=True) + biases
-                assert s_J.get_shape() == [batch_size, 1, 10, 16, 1]
+                s_J = tf.reduce_sum(s_J, axis=1, keepdims=True) + biases
 
                 # line 6:
                 # squash using Eq.1,
                 v_J = squash(s_J)
-                assert v_J.get_shape() == [batch_size, 1, 10, 16, 1]
             elif r_iter < iter_routing - 1:  # Inner iterations, do not apply backpropagation
                 s_J = tf.multiply(c_IJ, u_hat_stopped)
-                s_J = tf.nn.reduce_sum(s_J, axis=1, keepdims=True) + biases
+                s_J = tf.reduce_sum(s_J, axis=1, keepdims=True) + biases
                 v_J = squash(s_J)
 
                 # line 7:
@@ -158,8 +130,7 @@ def routing(input, b_IJ):
                 # then matmul in the last tow dim: [16, 1].T x [16, 1] => [1, 1], reduce mean in the
                 # batch_size dim, resulting in [1, 1152, 10, 1, 1]
                 v_J_tiled = tf.tile(v_J, [1, 1152, 1, 1, 1])
-                u_produce_v = tf.nn.reduce_sum(u_hat_stopped * v_J_tiled, axis=3, keepdims=True)
-                assert u_produce_v.get_shape() == [batch_size, 1152, 10, 1, 1]
+                u_produce_v = tf.reduce_sum(u_hat_stopped * v_J_tiled, axis=3, keepdims=True)
 
                 # b_IJ += tf.reduce_sum(u_produce_v, axis=0, keep_dims=True)
                 b_IJ += u_produce_v
@@ -174,7 +145,7 @@ def squash(vector):
     Returns:
         A tensor with the same shape as vector but squashed in 'vec_len' dimension.
     '''
-    vec_squared_norm = tf.nn.reduce_sum(tf.square(vector), -2, keepdims=True)
+    vec_squared_norm = tf.reduce_sum(tf.square(vector), -2, keepdims=True)
     scalar_factor = vec_squared_norm / (1 + vec_squared_norm) / tf.sqrt(vec_squared_norm + epsilon)
     vec_squashed = scalar_factor * vector  # element-wise
     return(vec_squashed)
@@ -211,13 +182,11 @@ class CapsNet(object):
             conv1 = tf.contrib.layers.conv2d(self.X, num_outputs=256,
                                              kernel_size=9, stride=1,
                                              padding='VALID')
-            assert conv1.get_shape() == [batch_size, 20, 20, 256]
 
         # Primary Capsules layer, return [batch_size, 1152, 8, 1]
         with tf.variable_scope('PrimaryCaps_layer'):
             primaryCaps = CapsLayer(num_outputs=32, vec_len=8, with_routing=False, layer_type='CONV')
             caps1 = primaryCaps(conv1, kernel_size=9, stride=2)
-            assert caps1.get_shape() == [batch_size, 1152, 8, 1]
 
         # DigitCaps layer, return [batch_size, 10, 16, 1]
         with tf.variable_scope('DigitCaps_layer'):
@@ -229,15 +198,13 @@ class CapsNet(object):
         with tf.variable_scope('Masking'):
             # a). calc ||v_c||, then do softmax(||v_c||)
             # [batch_size, 10, 16, 1] => [batch_size, 10, 1, 1]
-            self.v_length = tf.sqrt(tf.nn.reduce_sum(tf.square(self.caps2),
+            self.v_length = tf.sqrt(tf.reduce_sum(tf.square(self.caps2),
                                                axis=2, keepdims=True) + epsilon)
             self.softmax_v = tf.nn.softmax(self.v_length, axis=1)
-            assert self.softmax_v.get_shape() == [batch_size, 10, 1, 1]
 
             # b). pick out the index of max softmax val of the 10 caps
             # [batch_size, 10, 1, 1] => [batch_size] (index)
             self.argmax_idx = tf.to_int32(tf.argmax(self.softmax_v, axis=1))
-            assert self.argmax_idx.get_shape() == [batch_size, 1, 1]
             self.argmax_idx = tf.reshape(self.argmax_idx, shape=(batch_size, ))
 
             # Method 1.
@@ -251,21 +218,18 @@ class CapsNet(object):
                     masked_v.append(tf.reshape(v, shape=(1, 1, 16, 1)))
 
                 self.masked_v = tf.concat(masked_v, axis=0)
-                assert self.masked_v.get_shape() == [batch_size, 1, 16, 1]
             # Method 2. masking with true label, default mode
             else:
                 # self.masked_v = tf.matmul(tf.squeeze(self.caps2), tf.reshape(self.Y, (-1, 10, 1)), transpose_a=True)
                 self.masked_v = tf.multiply(tf.squeeze(self.caps2), tf.reshape(self.Y, (-1, 10, 1)))
-                self.v_length = tf.sqrt(tf.nn.reduce_sum(tf.square(self.caps2), axis=2, keepdims=True) + epsilon)
+                self.v_length = tf.sqrt(tf.reduce_sum(tf.square(self.caps2), axis=2, keepdims=True) + epsilon)
 
         # 2. Reconstructe the MNIST images with 3 FC layers
         # [batch_size, 1, 16, 1] => [batch_size, 16] => [batch_size, 512]
         with tf.variable_scope('Decoder'):
             vector_j = tf.reshape(self.masked_v, shape=(batch_size, -1))
             fc1 = tf.contrib.layers.fully_connected(vector_j, num_outputs=512)
-            assert fc1.get_shape() == [batch_size, 512]
             fc2 = tf.contrib.layers.fully_connected(fc1, num_outputs=1024)
-            assert fc2.get_shape() == [batch_size, 1024]
             self.decoded = tf.contrib.layers.fully_connected(fc2, num_outputs=784, activation_fn=tf.sigmoid)
 
     def loss(self):
@@ -276,7 +240,6 @@ class CapsNet(object):
         max_l = tf.square(tf.maximum(0., m_plus - self.v_length))
         # max_r = max(0, ||v_c||-m_minus)^2
         max_r = tf.square(tf.maximum(0., self.v_length - m_minus))
-        assert max_l.get_shape() == [batch_size, 10, 1, 1]
 
         # reshape: [batch_size, 10, 1, 1] => [batch_size, 10]
         max_l = tf.reshape(max_l, shape=(batch_size, -1))

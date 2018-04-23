@@ -347,9 +347,7 @@ def get_target(phn_location, dict_timit, input_size):
     for i in range(input_size):
         threshold =  16 + i * 10
         if hight_bound_ms > threshold:
-            tarray = np.zeros(61)
-            tarray[dict_timit[symbol]] = 1
-            target[i] = tarray
+            target[i] = dict_timit[symbol]
         else:
             #get next phonem
             phn_count = min(phn_count+1, phn_position_length)
@@ -358,11 +356,9 @@ def get_target(phn_location, dict_timit, input_size):
             hight_bound_ms = hight_bound * 0.0625
             symbol = symbol.rstrip()
 
-            tarray = np.zeros(61)
-            tarray[dict_timit[symbol]] = 1
-            target[i] = tarray
+            target[i] = dict_timit[symbol]
 
-    return target
+    return target.astype(int)
 
 
 def sliding_window(data, step_size, window_size):
