@@ -10,7 +10,7 @@ labels = get_timit_dict('phonedict.txt')
 batch_size = 64
 
 rate = 16000 #16000fps - 0.0625ms per frame
-stepsize = 2 #for spectogram reduction
+stepsize = 64 #for spectogram reduction
 
 frame_size = (int)((0.030 * rate) / stepsize) #30ms
 frame_step = (int)((0.015 * rate) / stepsize) #15ms
@@ -36,7 +36,8 @@ for dirName, subdirList, fileList in os.walk('./data/TRAIN/'):
         spectogram = pretty_spectrogram(data.astype('float64'), step_size=stepsize)
         phone_ids = get_target(phn_fname, labels, data.shape[0])
         for x, window in sliding_window(spectogram, frame_step, frame_size):
-            spectograms.append(window.astype(np.float32))
+            w = window.astype(np.float32)
+            spectograms.append(w)
             idx = x * stepsize + (int)(stepsize * frame_size / 2)
             phones.append(phone_ids[idx])
 
@@ -44,12 +45,12 @@ for dirName, subdirList, fileList in os.walk('./data/TRAIN/'):
 
         print('Loaded: {}'.format(fname[0:-4]))
 audio = np.concatenate(audio)
-spectograms = np.stack(spectograms)
+spectograms = np.expand_dims(np.stack(spectograms), axis=-1)
 #mfccs = np.concatenate(mfccs)
 phones = np.array(phones)
 
 X, y = get_batch_data(spectograms, phones, batch_size, 8)
-
+print(X.shape)
 model = CapsNet(X, y)
 
 #TODO: fix dimensions for capsule net

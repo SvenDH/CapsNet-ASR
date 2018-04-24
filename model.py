@@ -83,9 +83,9 @@ def routing(input, b_IJ):
      '''
 
     # W: [1, num_caps_i, num_caps_j * len_v_j, len_u_j, 1]
-    W = tf.get_variable('Weight', shape=(1, 1152, 160, 8, 1), dtype=tf.float32,
+    W = tf.get_variable('Weight', shape=(1, 8000, 976, 8, 1), dtype=tf.float32,
                         initializer=tf.random_normal_initializer(stddev=stddev))
-    biases = tf.get_variable('bias', shape=(1, 1, 10, 16, 1))
+    biases = tf.get_variable('bias', shape=(1, 1, 61, 16, 1))
 
     # Eq.2, calc u_hat
     # Since tf.matmul is a time-consuming op,
@@ -93,10 +93,10 @@ def routing(input, b_IJ):
     # ops instead. Matmul [a, b] x [b, c] is equal to a series ops as
     # element-wise multiply [a*c, b] * [a*c, b], reduce_sum at axis=1 and
     # reshape to [a, c]
-    input = tf.tile(input, [1, 1, 160, 1, 1])
+    input = tf.tile(input, [1, 1, 976, 1, 1])
 
     u_hat = tf.reduce_sum(W * input, axis=3, keepdims=True)
-    u_hat = tf.reshape(u_hat, shape=[-1, 1152, 10, 16, 1])
+    u_hat = tf.reshape(u_hat, shape=[-1, 8000, 61, 16, 1])
 
     # In forward, u_hat_stopped = u_hat; in backward, no gradient passed back from u_hat_stopped to u_hat
     u_hat_stopped = tf.stop_gradient(u_hat, name='stop_gradient')
@@ -129,7 +129,7 @@ def routing(input, b_IJ):
                 # reshape & tile v_j from [batch_size ,1, 10, 16, 1] to [batch_size, 1152, 10, 16, 1]
                 # then matmul in the last tow dim: [16, 1].T x [16, 1] => [1, 1], reduce mean in the
                 # batch_size dim, resulting in [1, 1152, 10, 1, 1]
-                v_J_tiled = tf.tile(v_J, [1, 1152, 1, 1, 1])
+                v_J_tiled = tf.tile(v_J, [1, 8000, 1, 1, 1])
                 u_produce_v = tf.reduce_sum(u_hat_stopped * v_J_tiled, axis=3, keepdims=True)
 
                 # b_IJ += tf.reduce_sum(u_produce_v, axis=0, keep_dims=True)
@@ -158,7 +158,7 @@ class CapsNet(object):
             if is_training:
                 self.X = data
                 self.labels = labels
-                self.Y = tf.one_hot(self.labels, depth=10, axis=1, dtype=tf.float32)
+                self.Y = tf.one_hot(self.labels, depth=61, axis=1, dtype=tf.float32)
 
                 self.build_arch()
                 self.loss()
@@ -169,28 +169,28 @@ class CapsNet(object):
                 self.optimizer = tf.train.AdamOptimizer()
                 self.train_op = self.optimizer.minimize(self.total_loss, global_step=self.global_step)  # var_list=t_vars)
             else:
-                self.X = tf.placeholder(tf.float32, shape=(batch_size, 28, 28, 1))
+                self.X = tf.placeholder(tf.float32, shape=(batch_size, 7, 256, 1))
                 self.labels = tf.placeholder(tf.int32, shape=(batch_size, ))
-                self.Y = tf.reshape(self.labels, shape=(batch_size, 10, 1))
+                self.Y = tf.reshape(self.labels, shape=(batch_size, 61, 1))
                 self.build_arch()
 
         tf.logging.info('Seting up the main structure')
 
     def build_arch(self):
         with tf.variable_scope('Conv1_layer'):
-            # Conv1, [batch_size, 20, 20, 256]
+            # Conv1, [batch_size, 5, 252, 256]
             conv1 = tf.contrib.layers.conv2d(self.X, num_outputs=256,
-                                             kernel_size=9, stride=1,
+                                             kernel_size=[3,5], stride=1,
                                              padding='VALID')
 
         # Primary Capsules layer, return [batch_size, 1152, 8, 1]
         with tf.variable_scope('PrimaryCaps_layer'):
             primaryCaps = CapsLayer(num_outputs=32, vec_len=8, with_routing=False, layer_type='CONV')
-            caps1 = primaryCaps(conv1, kernel_size=9, stride=2)
+            caps1 = primaryCaps(conv1, kernel_size=3, stride=2)
 
         # DigitCaps layer, return [batch_size, 10, 16, 1]
         with tf.variable_scope('DigitCaps_layer'):
-            digitCaps = CapsLayer(num_outputs=10, vec_len=16, with_routing=True, layer_type='FC')
+            digitCaps = CapsLayer(num_outputs=61, vec_len=16, with_routing=True, layer_type='FC')
             self.caps2 = digitCaps(caps1)
 
         # Decoder structure in Fig. 2
