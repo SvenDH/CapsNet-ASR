@@ -97,6 +97,6 @@ class CapsuleLoss(nn.Module):
         margin_loss = labels * left + 0.5 * (1. - labels) * right
         margin_loss = margin_loss.sum()
 
-        reconstruction_loss = self.reconstruction_loss(reconstructions, images).double()
+        reconstruction_loss = self.reconstruction_loss(reconstructions, images.view(images.size(0), -1)).double()
 
         return (margin_loss + 0.0005 * reconstruction_loss) / images.size(0)
