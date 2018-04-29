@@ -1,8 +1,11 @@
 import numpy as np
-import tensorflow as tf
 import copy
 from scipy.signal import butter, lfilter
+from scipy.io import wavfile
 import scipy.ndimage
+from torch.utils.data import DataLoader, Dataset
+import torch
+import os
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
@@ -365,12 +368,47 @@ def sliding_window(data, step_size, window_size):
     for x in range(0, data.shape[0] - window_size, step_size):
         yield x, data[x:x + window_size]
 
+class TimitDataset(Dataset):
 
-def get_batch_data(data, labels, batch_size, num_threads):
-    data_queues = tf.train.slice_input_producer([data, labels])
-    X, Y = tf.train.shuffle_batch(data_queues, num_threads=num_threads,
-                                  batch_size=batch_size,
-                                  capacity=batch_size * 64,
-                                  min_after_dequeue=batch_size * 32,
-                                  allow_smaller_final_batch=False)
-    return(X, Y)
+    def __init__(self, root_dir, labels, spectogram_step, frame_step, frame_size, traintest='TRAIN'):
+        self.audio = []
+        self.spectograms = []
+        # self.mfccs = []
+        self.phones = []
+        for dirName, subdirList, fileList in os.walk(os.path.join(root_dir, traintest)):
+            for fname in fileList:
+                if not fname.endswith('.phn') and not fname.endswith('.PHN') or (fname.startswith('SA')):
+                    continue
+
+                phn_fname = os.path.join(dirName, fname)
+                wav_fname = os.path.join(dirName, fname[0:-4] + '.WAV')
+
+                _, data = wavfile.read(wav_fname)
+
+                self.audio.append(data)
+                self.spectogram = pretty_spectrogram(data.astype('float64'), step_size=spectogram_step)
+                self.phone_ids = get_target(phn_fname, labels, data.shape[0])
+                for x, window in sliding_window(self.spectogram, frame_step, frame_size):
+                    w = window.astype(np.float32)
+                    self.spectograms.append(w)
+                    idx = x * spectogram_step + (int)(spectogram_step * frame_size / 2)
+                    self.phones.append(self.phone_ids[idx])
+
+                # self.mfccs.append(mfcc(data, rate))
+
+                print('Loaded: {}'.format(fname[0:-4]))
+        self.audio = np.concatenate(self.audio)
+        self.spectograms = np.expand_dims(np.stack(self.spectograms), axis=1)
+        # self.mfccs = np.concatenate(self.mfccs)
+        self.phones = np.array(self.phones)
+
+    def __len__(self):
+        return len(self.phones)
+
+    def __getitem__(self, idx):
+        return torch.from_numpy(self.spectograms[idx]), torch.from_numpy(self.phones[idx])
+
+
+def get_batch_data(data, batch_size):
+
+    return DataLoader(data, batch_size=batch_size, shuffle=True)
