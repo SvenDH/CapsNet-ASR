@@ -53,7 +53,7 @@ class CapsuleNet(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3,5), stride=1)
         self.primary_capsules = CapsuleLayer(num_capsules=8, num_route_nodes=-1, in_channels=256, out_channels=32,
                                              kernel_size=3, stride=2)
-        self.digit_capsules = CapsuleLayer(num_capsules=self.num_clases, num_route_nodes=32 * 250, in_channels=8,
+        self.digit_capsules = CapsuleLayer(num_capsules=self.num_clases, num_route_nodes=32 * 26, in_channels=8,
                                            out_channels=16)
 
         self.decoder = nn.Sequential(
@@ -61,7 +61,7 @@ class CapsuleNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(512, 1024),
             nn.ReLU(inplace=True),
-            nn.Linear(1024, 784),
+            nn.Linear(1024, 7 * 32),
             nn.Sigmoid()
         )
 
@@ -91,12 +91,12 @@ class CapsuleLoss(nn.Module):
         self.reconstruction_loss = nn.MSELoss(size_average=False)
 
     def forward(self, images, labels, classes, reconstructions):
-        left = F.relu(0.9 - classes, inplace=True) ** 2
-        right = F.relu(classes - 0.1, inplace=True) ** 2
+        left = F.relu(0.9 - classes, inplace=True).double() ** 2
+        right = F.relu(classes - 0.1, inplace=True).double() ** 2
 
         margin_loss = labels * left + 0.5 * (1. - labels) * right
         margin_loss = margin_loss.sum()
 
-        reconstruction_loss = self.reconstruction_loss(reconstructions, images)
+        reconstruction_loss = self.reconstruction_loss(reconstructions, images).double()
 
         return (margin_loss + 0.0005 * reconstruction_loss) / images.size(0)

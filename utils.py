@@ -337,7 +337,7 @@ def get_target(phn_location, dict_timit, input_size):
 
     phn_position_length = phn_position.__len__() -1
 
-    target = np.empty([input_size,61])
+    target = np.empty([input_size])
 
     #get first phonem
     phn_count = 0
@@ -370,7 +370,7 @@ def sliding_window(data, step_size, window_size):
 
 class TimitDataset(Dataset):
 
-    def __init__(self, root_dir, labels, spectogram_step, frame_step, frame_size, traintest='TRAIN'):
+    def __init__(self, root_dir, labels, spectogram_step, spectogram_freqs, frame_step, frame_size, traintest='TRAIN'):
         self.audio = []
         self.spectograms = []
         # self.mfccs = []
@@ -386,7 +386,7 @@ class TimitDataset(Dataset):
                 _, data = wavfile.read(wav_fname)
 
                 self.audio.append(data)
-                self.spectogram = pretty_spectrogram(data.astype('float64'), step_size=spectogram_step)
+                self.spectogram = pretty_spectrogram(data.astype('float64'), fft_size=spectogram_freqs, step_size=spectogram_step)
                 self.phone_ids = get_target(phn_fname, labels, data.shape[0])
                 for x, window in sliding_window(self.spectogram, frame_step, frame_size):
                     w = window.astype(np.float32)
@@ -401,6 +401,7 @@ class TimitDataset(Dataset):
         self.spectograms = np.expand_dims(np.stack(self.spectograms), axis=1)
         # self.mfccs = np.concatenate(self.mfccs)
         self.phones = np.array(self.phones)
+        self.phones = np.eye(len(labels))[self.phones]
 
     def __len__(self):
         return len(self.phones)
