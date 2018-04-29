@@ -28,7 +28,7 @@ class CapsuleLayer(nn.Module):
 
     def forward(self, x):
         if self.num_route_nodes != -1:
-            priors = x[None, :, :, None, :].mv(self.route_weights[:, None, :, :, :])
+            priors = torch.matmul(x[None, :, :, None, :], self.route_weights[:, None, :, :, :])
             logits = Variable(torch.zeros(*priors.size()))
             if torch.cuda.is_available():
                 logits = logits.cuda()
