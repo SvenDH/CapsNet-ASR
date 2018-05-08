@@ -11,14 +11,14 @@ from sklearn.metrics import accuracy_score
 labels = get_timit_dict('phonedict.txt')
 nr_classes = len(labels)
 batch_size = 64
-epochs = 10
+epochs = 1
 
 rate = 16000 #16000fps - 0.0625ms per frame
 stepsize = 64 #for spectogram reduction
 freq_bins = 64
 
-frame_size = (int)((0.030 * rate) / stepsize) #30ms
-frame_step = (int)((0.015 * rate) / stepsize) #15ms
+frame_size = (int)((0.025 * rate) / stepsize) #30ms
+frame_step = (int)((0.010 * rate) / stepsize) #15ms
 
 print('Frame size: {}, frame step size: {}'.format(frame_size, frame_step))
 
