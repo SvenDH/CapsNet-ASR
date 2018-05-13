@@ -44,6 +44,7 @@ def train_model(model, optimizer, num_epochs=10):
         for inputs, labels in dataloader:
 
             inputs = Variable(inputs).cuda()
+            print(inputs.size())
             labels = Variable(labels).cuda()
 
             optimizer.zero_grad()
