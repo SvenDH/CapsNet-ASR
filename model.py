@@ -10,12 +10,14 @@ class CapsuleLayer(nn.Module):
         super(CapsuleLayer, self).__init__()
 
         self.num_route_nodes = num_route_nodes
+        #print(self.num_route_nodes)
         self.num_iterations = num_iterations
 
         self.num_capsules = num_capsules
 
         if num_route_nodes != -1:
             self.route_weights = nn.Parameter(torch.randn(num_capsules, num_route_nodes, in_channels, out_channels))
+            #print(self.route_weights.size())
         else:
             self.capsules = nn.ModuleList(
                 [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=0) for _ in
@@ -44,6 +46,7 @@ class CapsuleLayer(nn.Module):
             outputs = [capsule(x).view(x.size(0), -1, 1) for capsule in self.capsules]
             outputs = torch.cat(outputs, dim=-1)
             outputs = self.squash(outputs)
+            print(outputs.size())
 
         return outputs
 
@@ -62,7 +65,7 @@ class CapsuleNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(512, 1024),
             nn.ReLU(inplace=True),
-            nn.Linear(1024, 7 * 32),
+            nn.Linear(1024, 6 * 32),
             nn.Sigmoid()
         )
 
