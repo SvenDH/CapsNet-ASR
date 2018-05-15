@@ -46,7 +46,7 @@ class CapsuleLayer(nn.Module):
             outputs = [capsule(x).view(x.size(0), -1, 1) for capsule in self.capsules]
             outputs = torch.cat(outputs, dim=-1)
             outputs = self.squash(outputs)
-            print(outputs.size())
+            #print(outputs.size())
 
         return outputs
 
