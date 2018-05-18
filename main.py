@@ -15,7 +15,7 @@ epochs = 10
 
 rate = 16000 #16000fps - 0.0625ms per frame
 stepsize = 64 #for spectogram reduction
-freq_bins = 64
+freq_bins = 32
 
 frame_size = (int)((0.060 * rate) / stepsize) #30ms
 frame_step = (int)((0.030 * rate) / stepsize) #15ms
