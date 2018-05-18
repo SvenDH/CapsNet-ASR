@@ -57,7 +57,7 @@ class CapsuleNet(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3,5), stride=1)
         self.primary_capsules = CapsuleLayer(num_capsules=8, num_route_nodes=-1, in_channels=256, out_channels=32,
                                              kernel_size=3, stride=2)
-        self.digit_capsules = CapsuleLayer(num_capsules=self.num_clases, num_route_nodes=32 * 13, in_channels=8,
+        self.digit_capsules = CapsuleLayer(num_capsules=self.num_clases, num_route_nodes=32 * 78, in_channels=8,
                                            out_channels=16)
 
         self.decoder = nn.Sequential(
