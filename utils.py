@@ -6,6 +6,7 @@ import scipy.ndimage
 from torch.utils.data import DataLoader, Dataset
 import torch
 import os
+from python_speech_features import mfcc
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
@@ -373,7 +374,8 @@ class TimitDataset(Dataset):
     def __init__(self, root_dir, labels, spectogram_step, spectogram_freqs, frame_step, frame_size, traintest='TRAIN'):
         self.audio = []
         self.spectograms = []
-        # self.mfccs = []
+        #MFCC not done yet
+        self.mfccs = []
         self.phones = []
         for dirName, subdirList, fileList in os.walk(os.path.join(root_dir, traintest)):
             for fname in fileList:
@@ -393,13 +395,15 @@ class TimitDataset(Dataset):
                     self.spectograms.append(w)
                     idx = x * spectogram_step + (int)(spectogram_step * frame_size / 2)
                     self.phones.append(self.phone_ids[idx])
-
-                # self.mfccs.append(mfcc(data, rate))
+                ### TODO Adjustable, these values are standard
+                self.mfccs.append(mfcc(data,samplerate=16000,winlen=0.025,winstep=0.01,numcep=13,
+                 nfilt=26,nfft=512,lowfreq=0,highfreq=None,preemph=0.97,
+     ceplifter=22,appendEnergy=True))
 
                 print('Loaded: {}'.format(fname[0:-4]))
         self.audio = np.concatenate(self.audio)
         self.spectograms = np.expand_dims(np.stack(self.spectograms), axis=1)
-        # self.mfccs = np.concatenate(self.mfccs)
+        self.mfccs = np.concatenate(self.mfccs)
         self.phones = np.array(self.phones)
         self.phones = np.eye(len(labels))[self.phones]
 
