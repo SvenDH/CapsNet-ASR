@@ -330,7 +330,17 @@ def get_timit_dict(dic_location):
     return dict_timit
 
 
-def get_target(phn_location, dict_timit, input_size):
+class RangeDict(dict):
+    def __getitem__(self, item):
+        if type(item) != range: # or xrange in Python 2
+            for key in self:
+                if item in key:
+                    return self[key]
+        else:
+            return super().__getitem__(item)
+
+
+def get_target(phn_location, dict_timit):
 
     phn_file = open(phn_location, 'r')
     phn_position = phn_file.readlines()
@@ -338,36 +348,23 @@ def get_target(phn_location, dict_timit, input_size):
 
     phn_position_length = phn_position.__len__() -1
 
-    target = np.empty([input_size])
+    target = RangeDict({})
 
-    #get first phonem
-    phn_count = 0
-    low_bound, hight_bound, symbol = phn_position[phn_count].split(" ")
-    hight_bound = int(hight_bound)
-    hight_bound_ms = hight_bound * 0.0625
-    symbol = symbol.rstrip()
+    for phn in phn_position:
+        low_bound, high_bound, symbol = phn.split(" ")
+        low_bound = int(low_bound)
+        high_bound = int(high_bound)
+        #high_bound_ms = high_bound * 0.0625
+        symbol = symbol.rstrip()
+        target[range(low_bound, high_bound)] = dict_timit[symbol]
 
-    #go step by step through target vector and add phonem vector
-    for i in range(input_size):
-        threshold =  16 + i * 10
-        if hight_bound_ms > threshold:
-            target[i] = dict_timit[symbol]
-        else:
-            #get next phonem
-            phn_count = min(phn_count+1, phn_position_length)
-            low_bound, hight_bound, symbol = phn_position[phn_count].split(" ")
-            hight_bound = int(hight_bound)
-            hight_bound_ms = hight_bound * 0.0625
-            symbol = symbol.rstrip()
-
-            target[i] = dict_timit[symbol]
-
-    return target.astype(int)
+    return target
 
 
 def sliding_window(data, step_size, window_size):
     for x in range(0, data.shape[0] - window_size, step_size):
         yield x, data[x:x + window_size]
+
 
 class TimitDataset(Dataset):
 
@@ -375,7 +372,7 @@ class TimitDataset(Dataset):
         self.audio = []
         self.spectograms = []
         #MFCC not done yet
-        self.mfccs = []
+        #self.mfccs = []
         self.phones = []
         for dirName, subdirList, fileList in os.walk(os.path.join(root_dir, traintest)):
             for fname in fileList:
@@ -389,21 +386,22 @@ class TimitDataset(Dataset):
 
                 self.audio.append(data)
                 self.spectogram = pretty_spectrogram(data.astype('float64'), fft_size=spectogram_freqs, step_size=spectogram_step)
-                self.phone_ids = get_target(phn_fname, labels, data.shape[0])
+                self.phone_ids = get_target(phn_fname, labels)
                 for x, window in sliding_window(self.spectogram, frame_step, frame_size):
                     w = window.astype(np.float32)
                     self.spectograms.append(w)
                     idx = x * spectogram_step + (int)(spectogram_step * frame_size / 2)
-                    self.phones.append(self.phone_ids[idx])
+                    phoneme = self.phone_ids[idx]
+                    self.phones.append(phoneme)
                 ### TODO Adjustable, these values are standard
-                self.mfccs.append(mfcc(data,samplerate=16000,winlen=0.025,winstep=0.01,numcep=13,
-                 nfilt=26,nfft=512,lowfreq=0,highfreq=None,preemph=0.97,
-     ceplifter=22,appendEnergy=True))
+                #self.mfccs.append(mfcc(data,samplerate=16000,winlen=0.025,winstep=0.01,numcep=13,
+                #nfilt=26,nfft=512,lowfreq=0,highfreq=None,preemph=0.97,ceplifter=22,appendEnergy=True))
+
 
                 print('Loaded: {}'.format(fname[0:-4]))
         self.audio = np.concatenate(self.audio)
         self.spectograms = np.expand_dims(np.stack(self.spectograms), axis=1)
-        self.mfccs = np.concatenate(self.mfccs)
+        #self.mfccs = np.concatenate(self.mfccs)
         self.phones = np.array(self.phones)
         self.phones = np.eye(len(labels))[self.phones]
 
