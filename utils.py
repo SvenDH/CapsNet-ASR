@@ -369,6 +369,7 @@ def sliding_window(data, step_size, window_size):
 class TimitDataset(Dataset):
 
     def __init__(self, root_dir, labels, spectogram_step, spectogram_freqs, frame_step, frame_size, traintest='TRAIN'):
+        self.labels = labels
         self.audio = []
         self.spectograms = []
         #MFCC not done yet
@@ -403,13 +404,17 @@ class TimitDataset(Dataset):
         self.spectograms = np.expand_dims(np.stack(self.spectograms), axis=1)
         #self.mfccs = np.concatenate(self.mfccs)
         self.phones = np.array(self.phones)
-        self.phones = np.eye(len(labels))[self.phones]
+        #self.phones = np.eye(len(labels))[self.phones]
 
     def __len__(self):
         return len(self.phones)
 
     def __getitem__(self, idx):
-        return torch.from_numpy(self.spectograms[idx]), torch.from_numpy(self.phones[idx])
+        image = self.spectograms[idx]
+        label = self.phones[idx]
+        onehot = np.zeros(len(self.labels))
+        onehot[label] = 1
+        return torch.from_numpy(image), torch.from_numpy(onehot)
 
 
 def get_batch_data(data, batch_size):
