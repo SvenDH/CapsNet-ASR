@@ -104,3 +104,48 @@ class CapsuleLoss(nn.Module):
         reconstruction_loss = self.reconstruction_loss(reconstructions, images.view(images.size(0), -1)).double()
 
         return (margin_loss + 0.0005 * reconstruction_loss) / images.size(0)
+
+
+class ConvNet(nn.Module):
+
+    def __init__(self, num_classes=10):
+        super(ConvNet, self).__init__()
+        # 1 input image channel, 6 output channels, 5x5 square convolution
+        # kernel
+        #self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3, 5))
+        #self.conv2 = nn.Conv2d(in_channels=256, out_channels=64, kernel_size=3)
+        #self.conv3 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3)
+        #self.fc1 = nn.Linear(16 * 3 * 3, 128)
+        #self.fc2 = nn.Linear(128, num_classes)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3,5))
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(in_channels=256, out_channels=32, kernel_size=3)
+        self.fc1 = nn.Linear(in_features=32 * 4 * 4, out_features=120)
+        self.fc2 = nn.Linear(in_features=120, out_features=84)
+        self.fc3 = nn.Linear(in_features=84, out_features=num_classes)
+
+    def forward(self, x):
+        # Max pooling over a (2, 2) window
+        #x = F.max_pool2d(F.relu(self.conv1(x)), 2)
+        #x = F.max_pool2d(F.relu(self.conv2(x)), 2).squeeze()
+        #print(x.size())
+        #x = F.max_pool2d(F.relu(self.conv3(x)), 2)
+        #x = x.view(-1, self.num_flat_features(x))
+        #x = F.relu(self.fc1(x))
+        #x = self.fc2(x)
+        #return F.softmax(x, dim=-1)
+        x = self.pool(F.relu(self.conv1(x)))
+        x = F.relu(self.conv2(x))
+        x = x.view(-1, 32 * 4 * 4)
+        #print(x.size())
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x.double()
+
+    def num_flat_features(self, x):
+        size = x.size()[1:]  # all dimensions except the batch dimension
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features

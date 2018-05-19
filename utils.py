@@ -390,6 +390,7 @@ class TimitDataset(Dataset):
                 self.phone_ids = get_target(phn_fname, labels)
                 for x, window in sliding_window(self.spectogram, frame_step, frame_size):
                     w = window.astype(np.float32)
+                    #print(np.shape(w))
                     self.spectograms.append(w)
                     idx = x * spectogram_step + (int)(spectogram_step * frame_size / 2)
                     phoneme = self.phone_ids[idx]
@@ -419,4 +420,4 @@ class TimitDataset(Dataset):
 
 def get_batch_data(data, batch_size):
 
-    return DataLoader(data, batch_size=batch_size, shuffle=True)
+    return DataLoader(data, batch_size=batch_size, shuffle=True, drop_last=False)
