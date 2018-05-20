@@ -69,8 +69,8 @@ def train_model(model, optimizer, num_epochs=10):
             else:
                 outputs = model(inputs)
                 _, preds = torch.max(outputs, 1)
-                print(preds.size())
-                print(labels.size())
+                #print(preds.size())
+                #print(labels.size())
                 _, true = torch.max(labels, 1)
                 loss = convnet_loss(outputs, labels)
 
@@ -107,9 +107,10 @@ def test_model(model):
             outputs = model(inputs)
 
         _, preds = torch.max(outputs, 1)
+        _, labels = torch.max(labels, 1)
 
         total += labels.size(0)
-        correct += (preds.double() == labels[:,idx]).sum().item()
+        correct += (preds.double() == labels.double()).sum().item()
 
         
     print('Accuracy of the network on the test images: %d %%' % (
