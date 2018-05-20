@@ -415,7 +415,7 @@ class TimitDataset(Dataset):
         label = self.phones[idx]
         onehot = np.zeros(len(self.labels))
         onehot[label] = 1
-        return torch.from_numpy(image), torch.from_numpy(onehot)
+        return torch.from_numpy(image), torch.from_numpy(onehot).float()
 
 
 def get_batch_data(data, batch_size):

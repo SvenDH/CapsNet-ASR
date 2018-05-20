@@ -1,6 +1,6 @@
 import numpy as np
 from utils import get_timit_dict, get_batch_data, TimitDataset
-from model import CapsuleNet, CapsuleLoss, ConvNet
+from model import CapsuleNet, ConvNet
 import torch
 from torch import optim
 from torch.autograd import Variable
@@ -34,7 +34,6 @@ device = torch.cuda.device(0)
 capsnet = CapsuleNet(num_classes=nr_classes)
 capsnet.cuda()
 
-capsnet_loss = CapsuleLoss()
 capsnet_optimizer = optim.Adam(capsnet.parameters())
 
 convnet = ConvNet(num_classes = nr_classes)
@@ -56,21 +55,16 @@ def train_model(model, optimizer, num_epochs=10):
             inputs = Variable(inputs).cuda()
             labels = Variable(labels).cuda()
 
-            #print(inputs.size())
-
             optimizer.zero_grad()
 
             if model == capsnet:
-                outputs, reconstructions = model(inputs)
-                _, preds = torch.max(outputs, 1)
+                outputs, preds, reconstructions = model(inputs)
+                _, preds = torch.max(preds, 1)
                 _, true = torch.max(labels, 1)
-
-                loss = capsnet_loss(inputs, labels, outputs, reconstructions)
+                loss = capsnet.loss(inputs, labels, outputs, reconstructions)
             else:
                 outputs = model(inputs)
                 _, preds = torch.max(outputs, 1)
-                #print(preds.size())
-                #print(labels.size())
                 _, true = torch.max(labels, 1)
                 loss = convnet_loss(outputs, labels)
 
@@ -78,8 +72,8 @@ def train_model(model, optimizer, num_epochs=10):
             optimizer.step()
 
             # print statistics
-            running_loss += loss.item()
-            if idx % 100 == 99:  # print every 100 mini-batches
+            running_loss += loss.data[0]
+            if idx % 100 == 0:  # print every 100 mini-batches
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, idx + 1, running_loss / 100))
                 running_loss = 0.0
@@ -96,7 +90,7 @@ def test_model(model):
         labels = Variable(labels).cuda()
 
         if model == capsnet:
-            outputs, _ = model(inputs)
+            _, outputs, _ = model(inputs)
         else:
             outputs = model(inputs)
 

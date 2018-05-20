@@ -37,7 +37,7 @@ class CapsuleLayer(nn.Module):
             b_ij = Variable(torch.zeros(1, self.num_route_nodes, self.num_capsules, 1)).cuda()
 
             for iteration in range(self.num_iterations):
-                c_ij = F.softmax(b_ij)
+                c_ij = F.softmax(b_ij, dim=-1)
                 c_ij = torch.cat([c_ij] * batch_size, dim=0).unsqueeze(4)
 
                 s_j = (c_ij * u_hat).sum(dim=1, keepdim=True)
@@ -75,41 +75,46 @@ class CapsuleNet(nn.Module):
             nn.Sigmoid()
         )
 
+        self.mse_loss = nn.MSELoss()
+
     def forward(self, x, y=None):
         x = F.relu(self.conv1(x))
         x = self.primary_capsules(x)
-        x = self.digit_capsules(x).squeeze().transpose(0, 1)
+        x = self.digit_capsules(x)
+        output = x
 
-        classes = (x ** 2).sum(dim=-1) ** 0.5
-        classes = F.softmax(classes, dim=-1)
+        classes = torch.sqrt((x ** 2).sum(2))
+        classes = F.softmax(classes, dim=-1).squeeze()
 
         if y is None:
             # In all batches, get the most active capsule.
             _, max_length_indices = classes.max(dim=1)
-            if torch.cuda.is_available():
-                y = Variable(torch.eye(self.num_classes)).cuda().index_select(dim=0, index=max_length_indices)
-            else:
-                y = Variable(torch.eye(self.num_classes)).index_select(dim=0, index=max_length_indices)
-        reconstructions = self.decoder((x * y[:, :, None]).view(x.size(0), -1))
+            y = Variable(torch.eye(self.num_classes)).cuda().index_select(dim=0, index=max_length_indices)
 
-        return classes, reconstructions
+        reconstructions = self.decoder((x * y[:, :, None, None]).view(x.size(0), -1))
+        reconstructions = reconstructions.view(-1, 1, 15, 16)
 
+        return output, classes, reconstructions
 
-class CapsuleLoss(nn.Module):
-    def __init__(self):
-        super(CapsuleLoss, self).__init__()
-        self.reconstruction_loss = nn.MSELoss(size_average=False)
+    def loss(self, data, target, x, reconstructions):
+        return self.margin_loss(x, target) + self.reconstruction_loss(data, reconstructions)
 
-    def forward(self, images, labels, classes, reconstructions):
-        left = F.relu(0.9 - classes, inplace=True).double() ** 2
-        right = F.relu(classes - 0.1, inplace=True).double() ** 2
+    def margin_loss(self, x, labels):
+        batch_size = x.size(0)
 
-        margin_loss = labels * left + 0.5 * (1. - labels) * right
-        margin_loss = margin_loss.sum()
+        v_c = torch.sqrt((x ** 2).sum(dim=2, keepdim=True))
 
-        reconstruction_loss = self.reconstruction_loss(reconstructions, images.view(images.size(0), -1)).double()
+        left = F.relu(0.9 - v_c).view(batch_size, -1)
+        right = F.relu(v_c - 0.1).view(batch_size, -1)
 
-        return (margin_loss + 0.0005 * reconstruction_loss) / images.size(0)
+        loss = labels * left + 0.5 * (1.0 - labels) * right
+        loss = loss.sum(dim=1).mean()
+
+        return loss
+
+    def reconstruction_loss(self, data, reconstructions):
+        loss = self.mse_loss(reconstructions.view(reconstructions.size(0), -1), data.view(reconstructions.size(0), -1))
+        return loss * 0.0005
 
 
 class ConvNet(nn.Module):
