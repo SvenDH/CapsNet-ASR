@@ -16,32 +16,38 @@ class CapsuleLayer(nn.Module):
         self.num_capsules = num_capsules
 
         if num_route_nodes != -1:
-            self.route_weights = nn.Parameter(torch.randn(num_capsules, num_route_nodes, in_channels, out_channels))
+            self.W = nn.Parameter(torch.randn(1, num_route_nodes, num_capsules, out_channels, in_channels))
             #print(self.route_weights.size())
         else:
             self.capsules = nn.ModuleList(
                 [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=0) for _ in
                  range(num_capsules)])
 
-    @staticmethod
-    def squash(tensor, dim=-1):
-        squared_norm = (tensor ** 2).sum(dim=dim, keepdim=True)
-        scale = squared_norm / (1 + squared_norm)
-        return scale * tensor / torch.sqrt(squared_norm)
+    def squash(self, input_tensor):
+        squared_norm = (input_tensor ** 2).sum(-1, keepdim=True)
+        output_tensor = squared_norm * input_tensor / ((1. + squared_norm) * torch.sqrt(squared_norm))
+        return output_tensor
 
     def forward(self, x):
+        batch_size = x.size(0)
         if self.num_route_nodes != -1:
-            priors = torch.matmul(x[None, :, :, None, :], self.route_weights[:, None, :, :, :])
-            logits = Variable(torch.zeros(*priors.size()))
-            if torch.cuda.is_available():
-                logits = logits.cuda()
-            for i in range(self.num_iterations):
-                probs = F.softmax(logits, dim=2)
-                outputs = self.squash((probs * priors).sum(dim=2, keepdim=True))
+            x = torch.stack([x] * self.num_capsules, dim=2).unsqueeze(4)
+            W = torch.cat([self.W] * batch_size, dim=0)
+            u_hat = torch.matmul(W, x)
+            b_ij = Variable(torch.zeros(1, self.num_route_nodes, self.num_capsules, 1)).cuda()
 
-                if i != self.num_iterations - 1:
-                    delta_logits = (priors * outputs).sum(dim=-1, keepdim=True)
-                    logits = logits + delta_logits
+            for iteration in range(self.num_iterations):
+                c_ij = F.softmax(b_ij)
+                c_ij = torch.cat([c_ij] * batch_size, dim=0).unsqueeze(4)
+
+                s_j = (c_ij * u_hat).sum(dim=1, keepdim=True)
+                v_j = self.squash(s_j)
+
+                if iteration < self.num_iterations - 1:
+                    a_ij = torch.matmul(u_hat.transpose(3, 4), torch.cat([v_j] * self.num_route_nodes, dim=1))
+                    b_ij = b_ij + a_ij.squeeze(4).mean(dim=0, keepdim=True)
+
+            outputs = v_j.squeeze(1)
         else:
             outputs = [capsule(x).view(x.size(0), -1, 1) for capsule in self.capsules]
             outputs = torch.cat(outputs, dim=-1)
@@ -51,17 +57,17 @@ class CapsuleLayer(nn.Module):
         return outputs
 
 class CapsuleNet(nn.Module):
-    def __init__(self, num_clases=10):
+    def __init__(self, num_classes=10):
         super(CapsuleNet, self).__init__()
-        self.num_clases = num_clases
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3,5), stride=1)
+        self.num_classes = num_classes
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=5, stride=1)
         self.primary_capsules = CapsuleLayer(num_capsules=8, num_route_nodes=-1, in_channels=256, out_channels=32,
                                              kernel_size=3, stride=2)
-        self.digit_capsules = CapsuleLayer(num_capsules=self.num_clases, num_route_nodes=32 * 30, in_channels=8,
+        self.digit_capsules = CapsuleLayer(num_capsules=self.num_classes, num_route_nodes=32 * 5 * 5, in_channels=8,
                                            out_channels=16)
 
         self.decoder = nn.Sequential(
-            nn.Linear(16 * self.num_clases, 512),
+            nn.Linear(16 * self.num_classes, 512),
             nn.ReLU(inplace=True),
             nn.Linear(512, 1024),
             nn.ReLU(inplace=True),
@@ -70,7 +76,7 @@ class CapsuleNet(nn.Module):
         )
 
     def forward(self, x, y=None):
-        x = F.relu(self.conv1(x), inplace=True)
+        x = F.relu(self.conv1(x))
         x = self.primary_capsules(x)
         x = self.digit_capsules(x).squeeze().transpose(0, 1)
 
@@ -81,9 +87,9 @@ class CapsuleNet(nn.Module):
             # In all batches, get the most active capsule.
             _, max_length_indices = classes.max(dim=1)
             if torch.cuda.is_available():
-                y = Variable(torch.eye(self.num_clases)).cuda().index_select(dim=0, index=max_length_indices)
+                y = Variable(torch.eye(self.num_classes)).cuda().index_select(dim=0, index=max_length_indices)
             else:
-                y = Variable(torch.eye(self.num_clases)).index_select(dim=0, index=max_length_indices)
+                y = Variable(torch.eye(self.num_classes)).index_select(dim=0, index=max_length_indices)
         reconstructions = self.decoder((x * y[:, :, None]).view(x.size(0), -1))
 
         return classes, reconstructions

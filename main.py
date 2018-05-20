@@ -31,7 +31,7 @@ testloader = get_batch_data(test_set, batch_size)
 
 device = torch.cuda.device(0)
 
-capsnet = CapsuleNet(num_clases=nr_classes)
+capsnet = CapsuleNet(num_classes=nr_classes)
 capsnet.cuda()
 
 capsnet_loss = CapsuleLoss()
@@ -110,5 +110,5 @@ def test_model(model):
     print('Accuracy of the network on the test images: %d %%' % (
         100 * correct / total))
 
-model = train_model(convnet, convnet_optimizer, num_epochs=epochs)
+model = train_model(capsnet, capsnet_optimizer, num_epochs=epochs)
 test_model(convnet)
