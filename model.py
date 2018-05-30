@@ -83,8 +83,8 @@ class CapsuleNet(nn.Module):
         x = self.digit_capsules(x)
         output = x
 
-        classes = torch.sqrt((x ** 2).sum(2))
-        classes = F.softmax(classes, dim=-1).squeeze()
+        classes = torch.sqrt((x ** 2).sum(2)).squeeze()
+        classes = F.softmax(classes, dim=-1)
 
         if y is None:
             # In all batches, get the most active capsule.

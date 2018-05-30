@@ -49,6 +49,7 @@ def train_model(model, optimizer, num_epochs=10):
         print('-' * 10)
         model.train()
         running_loss = 0.0
+        running_accuracy = 0.0
 
         for idx, (inputs, labels) in enumerate(trainloader, 0):
 
@@ -73,10 +74,12 @@ def train_model(model, optimizer, num_epochs=10):
 
             # print statistics
             running_loss += loss.data[0]
+            running_accuracy += np.sum(preds.data[0] == true.data[0]) / batch_size
             if idx % 100 == 0:  # print every 100 mini-batches
-                print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, idx + 1, running_loss / 100))
+                print('[%d, %5d] loss: %.6f, acc: %.6f' %
+                      (epoch + 1, idx + 1, running_loss / 100, running_accuracy / 100))
                 running_loss = 0.0
+                running_accuracy = 0.0
 
     return model
 
