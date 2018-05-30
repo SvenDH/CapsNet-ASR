@@ -71,10 +71,10 @@ def train_model(model, optimizer, num_epochs=10):
 
             loss.backward()
             optimizer.step()
-
+            
             # print statistics
             running_loss += loss.data[0]
-            running_accuracy += np.sum(preds.data[0] == true.data[0]) / batch_size
+            running_accuracy += torch.sum(preds == true) / batch_size
             if idx % 100 == 0:  # print every 100 mini-batches
                 print('[%d, %5d] loss: %.6f, acc: %.6f' %
                       (epoch + 1, idx + 1, running_loss / 100, running_accuracy / 100))
